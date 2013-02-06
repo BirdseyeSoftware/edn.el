@@ -37,9 +37,6 @@
 ;; mappings in elisp (alist, plist, hash-table), `edn-read' allows you
 ;; to specify which you'd prefer (see `edn-map-type').
 
-;; Similarly, since `false' and `nil' are distinct in EDN, you can
-;; distinguish them by binding `edn-false' and `edn-nil' as desired.
-
 ;;; History:
 
 ;; 2013-02-06 - Initial version.
@@ -185,7 +182,6 @@ this around your call to `edn-read' instead of `setq'ing it.")
 (defvar edn-keywords '("true" "false" "nil")
   "List of EDN keywords.")
 
-(setq edn-keywords '("true" "false" "nil"))
 
 ;; Keyword parsing
 
@@ -581,21 +577,6 @@ become EDN objects."
     table)
   "Readtable for EDN reader.")
 
-(setq edn-readtable (let ((table
-         '((?t  edn-read-keyword "true")
-           (?f  edn-read-keyword "false")
-           (?n  edn-read-keyword "nil")
-           (?{  edn-read-map)
-           (?\[ edn-read-vector)
-           (?\( edn-read-list)
-           (?\# edn-read-set)
-           (?\" edn-read-string)
-           (?:  edn-read-keyword)
-           (?'  edn-read-symbol))))
-    (mapc (lambda (char)
-            (push (list char 'edn-read-number) table))
-          '(?- ?+ ?. ?0 ?1 ?2 ?3 ?4 ?5 ?6 ?7 ?8 ?9))
-    table))
 
 (defun edn-read ()
   "Parse and return the EDN object following point.
