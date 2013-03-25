@@ -108,8 +108,9 @@ this around your call to `edn-read' instead of `setq'ing it.")
 (defun edn-alist-p (list)
   "Non-nil if and only if LIST is an alist."
   (and (listp list)
-       (evenp (length list))
-       (consp (car list))))
+       (--all-p  (and (consp it)
+                      (or (not (consp (cdr it)))
+                          (equal 2 (length it)))) list)))
 
 (defun edn-plist-p (list)
   "Non-nil if and only if LIST is a plist."

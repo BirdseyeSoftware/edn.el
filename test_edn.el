@@ -18,6 +18,17 @@
         (output "(\"hello\" \"world\")"))
     (should (string-equal (edn-encode-list input) output))))
 
+(ert-deftest edn-test-alist-p ()
+  (should (edn-alist-p '((:hello . world)
+                         (:hola  . mundo))))
+  ;;(should (null (edn-alist-p '(:hello world how))))
+  )
+
+(let ((it '(:hell "world" "blah")))
+  (or (not (consp (cdr it)))
+      (equal 2 (length it))))
+
+
 (ert-deftest edn-test-alist-encode ()
   (let ((input (list '(:hello . "world") '("hola" . 123)))
         (output "{:hello \"world\" \"hola\" 123}"))))
