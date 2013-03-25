@@ -53,6 +53,9 @@
 
 ;; Parameters
 
+(defvar edn-encode-timestamp nil
+  "Encode tuples of integers as timestamps.")
+
 (defvar edn-map-type 'alist
   "Type to convert EDN objects to.
 Must be one of `alist', `plist', or `hash-table'. Consider let-binding
@@ -95,11 +98,18 @@ this around your call to `edn-read' instead of `setq'ing it.")
   "Join STRINGS with SEPARATOR."
   (mapconcat 'identity strings separator))
 
+;; (defun edn-alist-p (list)
+;;   "Non-nil if and only if LIST is an alist."
+;;   (or (null list)
+;;       (and (consp (car list))
+;;            (edn-alist-p (cdr list)))))
+
+
 (defun edn-alist-p (list)
   "Non-nil if and only if LIST is an alist."
-  (or (null list)
-      (and (consp (car list))
-           (edn-alist-p (cdr list)))))
+  (and (listp list)
+       (evenp (length list))
+       (consp (car list))))
 
 (defun edn-plist-p (list)
   "Non-nil if and only if LIST is a plist."
@@ -209,7 +219,7 @@ KEYWORD is the keyword expected."
 
 ;; Keyword encoding
 
-(defun edn-encode-keyword (keyword)
+(defun edn-encode-lang-keyword (keyword)
   "Encode KEYWORD as a EDN value."
   (cond ((eq keyword t)          "true")
         ((eq keyword edn-false) "false")
@@ -252,7 +262,7 @@ representation will be parsed correctly."
 (defvar edn-special-chars
   '((?\" . ?\")
     (?\\ . ?\\)
-    (?/ . ?/)
+    ;; (?/ . ?/)
     (?b . ?\b)
     (?f . ?\f)
     (?n . ?\n)
@@ -359,6 +369,9 @@ representation will be parsed correctly."
   "Return a EDN representation of STRING."
   (format "\"%s\"" (mapconcat 'edn-encode-char string "")))
 
+(defun edn-encode-keyword (kw)
+  (format "%s" kw))
+
 ;;; EDN Objects
 
 (defun edn-new-object ()
@@ -445,13 +458,13 @@ Please see the documentation of `edn-map-type' and `edn-key-type'."
            (let (r)
              (maphash
               (lambda (k v)
-                (push (format "%s:%s"
+                (push (format "%s %s"
                               (edn-encode k)
                               (edn-encode v))
                       r))
               hash-table)
              r)
-           ", ")))
+           " ")))
 
 ;; List encoding (including alists and plists)
 
@@ -459,35 +472,53 @@ Please see the documentation of `edn-map-type' and `edn-key-type'."
   "Return a EDN representation of ALIST."
   (format "{%s}"
           (edn-join (mapcar (lambda (cons)
-                               (format "%s:%s"
+                               (format "%s %s"
                                        (edn-encode (car cons))
                                        (edn-encode (cdr cons))))
                              alist)
-                     ", ")))
+                     " ")))
 
 (defun edn-encode-plist (plist)
   "Return a EDN representation of PLIST."
   (let (result)
     (while plist
       (push (concat (edn-encode (car plist))
-                    ":"
+                    " "
                     (edn-encode (cadr plist)))
             result)
       (setq plist (cddr plist)))
-    (concat "{" (edn-join (nreverse result) ", ") "}")))
+    (concat "{" (edn-join (nreverse result) " ") "}")))
+
+(defun edn-encode-simple-list (list)
+  "Return a EDN simple list"
+  (concat "(" (mapconcat 'edn-encode list " ") ")"))
+
+
+(defun rfc3339-datetime (&optional time)
+  (let ((stamp (format-time-string "%Y-%m-%dT%H:%M:%S%z" time)))
+    (format "%s:%s" (substring stamp 0 -2) (substring stamp -2))))
+
+(defun edn-timestamp-p (list)
+  (and edn-encode-timestamp
+       (listp list)
+       (= (length list) 2)
+       (integerp (car list))
+       (integerp (second list))))
+
+(defun edn-encode-timestamp (list)
+  (format "#inst \"%s\"" (rfc3339-datetime list)))
 
 (defun edn-encode-list (list)
   "Return a EDN representation of LIST.
 Tries to DWIM: simple lists become EDN lists, while alists and plists
 become EDN objects."
   (cond ((null list)         "nil")
-        ((edn-alist-p list) (edn-encode-alist list))
-        ((edn-plist-p list) (edn-encode-plist list))
-        ((listp list)        (edn-encode-vector list))
+        ((edn-alist-p list)  (edn-encode-alist list))
+        ((edn-plist-p list)  (edn-encode-plist list))
+        ((edn-timestamp-p list) (edn-encode-timestamp list))
+        ((listp list)        (edn-encode-simple-list list))
         (t
          (signal 'edn-error (list list)))))
-
-;;; Arrays
 
 ;; List parsing
 
@@ -553,7 +584,7 @@ become EDN objects."
 
 (defun edn-encode-vector (vec)
   "Return a EDN representation of ARRAY."
-  (concat "[" (mapconcat 'edn-encode vec ", ") "]"))
+  (concat "[" (mapconcat 'edn-encode vec " ") "]"))
 
 
 
@@ -606,22 +637,20 @@ Advances point just past EDN object."
     (goto-char (point-min))
     (edn-read)))
 
-
-
 ;;; EDN encoder
 
 (defun edn-encode (object)
   "Return a EDN representation of OBJECT as a string."
   (cond ((memq object (list t edn-nil edn-false))
-         (edn-encode-keyword object))
+         (edn-encode-lang-keyword object))
         ((stringp object)      (edn-encode-string object))
-        ((keywordp object)     (edn-encode-string
-                                (substring (symbol-name object) 1)))
+        ((keywordp object)     (edn-encode-keyword object))
         ((symbolp object)      (edn-encode-string
                                 (symbol-name object)))
         ((numberp object)      (edn-encode-number object))
         ((arrayp object)       (edn-encode-vector object))
         ((hash-table-p object) (edn-encode-hash-table object))
+        ((vectorp object)      (edn-encode-vector object))
         ((listp object)        (edn-encode-list object))
         (t                     (signal 'edn-error (list object)))))
 
