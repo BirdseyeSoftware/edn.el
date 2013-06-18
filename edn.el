@@ -42,7 +42,7 @@
 ;; 2013-02-06 - Initial version.
 
 ;;; Code:
-
+(require 'dash)
 (eval-when-compile (require 'cl))
 
 ;; Compatibility code
